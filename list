@@ -1,0 +1,62 @@
+# Define the WEC server and subscription details
+$WecServer = "WECServerName"
+$SubscriptionName = "YourSubscriptionName"
+$EventLogName = "Security"  # Adjust based on the event log you want to collect
+
+# Specify the two OU names to check for
+$OUPartialName1 = "name1"
+$OUPartialName2 = "name2"
+
+# Get a list of servers from Active Directory based on the specified OU filter
+$Servers = Get-ADComputer -Filter * | Where-Object {
+    $_.DistinguishedName -like "*$OUPartialName1*" -and $_.DistinguishedName -like "*$OUPartialName2*"
+} | Select-Object -ExpandProperty Name
+
+# Display the list of servers to the user
+Write-Host "Servers to be checked and possibly added to the subscription:"
+$Servers | ForEach-Object { Write-Host " - $_" }
+
+# Prompt the user to confirm before proceeding
+$Confirmation = Read-Host "Do you want to proceed and check/add these servers to the subscription? (Yes/No)"
+if ($Confirmation -eq 'Yes' -or $Confirmation -eq 'Y') {
+    # Loop through each server and check/add it to the subscription
+    foreach ($Server in $Servers) {
+        # Check if the server is already part of the subscription
+        $IsAlreadySubscribed = wecutil gs | Select-String -Pattern $Server
+        if ($IsAlreadySubscribed) {
+            Write-Host "Server $($Server) is already part of the subscription. Skipping."
+        } else {
+            # If not subscribed, add the server to the subscription
+            $Subscription = @"
+                <Subscription>
+                    <SubscriptionId>{$SubscriptionName}</SubscriptionId>
+                    <SubscriptionType>SourceInitiated</SubscriptionType>
+                    <Enabled>true</Enabled>
+                    <Uri>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</Uri>
+                    <ConfigurationMode>MinLatency</ConfigurationMode>
+                    <SubscriptionMode>SourceInitiated</SubscriptionMode>
+                    <ReadExistingEvents>false</ReadExistingEvents>
+                    <TransportName>HTTP</TransportName>
+                    <ContentFormat>RenderedText</ContentFormat>
+                    <Locale Language="en-US"/>
+                    <LogFile>{$EventLogName}</LogFile>
+                    <Destination>
+                        <SubscriptionDialect>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog</SubscriptionDialect>
+                        <SubscriptionDialect>http://schemas.microsoft.com/wbem/wsman/1/windows/EventLog/Query</SubscriptionDialect>
+                        <Address>{$Server}</Address>
+                    </Destination>
+                </Subscription>
+"@
+
+            # Add the server to the subscription
+            $Result = wecutil ss $Subscription
+            if ($Result -eq 0) {
+                Write-Host "Server $($Server) added to the subscription successfully."
+            } else {
+                Write-Host "Failed to add server $($Server) to the subscription. Error code: $($Result)"
+            }
+        }
+    }
+} else {
+    Write-Host "Operation canceled. No servers were checked or added to the subscription."
+}
