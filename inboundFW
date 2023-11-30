@@ -1,0 +1,3 @@
+New-NetFirewallRule -DisplayName "Windows Remote Management (HTTP-In)" -Direction inbound -LocalPort 5985 -Protocol tcp
+
+Restart-Service WinRM
