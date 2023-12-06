@@ -1,0 +1,54 @@
+# Define the WEC server and subscription details
+$WecServer = "WECServerName"
+$SubscriptionName = "test"
+$EventLogName = "Security"  # Adjust based on the event log you want to collect
+
+# Specify the OU names that the server must be a part of
+$OU1 = "name1"
+$OU2 = "name2"
+
+# Get a list of servers from Active Directory based on the specified OU filter
+$Servers = Get-ADComputer -Filter * | Where-Object {
+    ($_.DistinguishedName -like "*OU=$OU1,*") -and ($_.DistinguishedName -like "*OU=$OU2,*")
+} | Select-Object -ExpandProperty Name
+
+# Display the list of servers to the user
+Write-Host "Servers to be added to the subscription:"
+$Servers | ForEach-Object { Write-Host " - $_" }
+
+# Prompt the user to confirm before proceeding
+$Confirmation = Read-Host "Do you want to proceed and add these servers to the subscription? (Yes/No)"
+if ($Confirmation -eq 'Yes' -or $Confirmation -eq 'Y') {
+    # Loop through each server and add it to the subscription
+    foreach ($Server in $Servers) {
+        # Check if the server is already part of the subscription
+        $IsAlreadySubscribed = $false
+
+        try {
+            $events = Get-WinEvent -FilterHashtable @{
+                LogName = $EventLogName
+                ID = 1102
+                Data = "SubscriptionId='$SubscriptionName',SourceAddress='$Server'"
+            } -MaxEvents 1 -ErrorAction Stop
+            $IsAlreadySubscribed = $events.Count -gt 0
+        } catch {
+            # Handle any errors when checking subscription status
+            Write-Host "Error checking subscription status for $($Server): $_"
+        }
+
+        if ($IsAlreadySubscribed) {
+            Write-Host "Server $($Server) is already part of the subscription. Skipping."
+        } else {
+            # If not subscribed, add the server to the subscription
+            try {
+                New-WinEventForwardingSubscription -SubscriptionId $SubscriptionName -LogName $EventLogName -SourceAddress $Server -Force
+                Write-Host "Server $($Server) added to the subscription successfully."
+            } catch {
+                # Handle any errors when adding to the subscription
+                Write-Host "Error adding server $($Server) to the subscription: $_"
+            }
+        }
+    }
+} else {
+    Write-Host "Operation canceled. No servers were checked or added to the subscription."
+}
