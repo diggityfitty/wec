@@ -8,8 +8,13 @@ $OUPartialNames = @("Keyword1", "Keyword2")
 # Add more keywords as needed
 
 # Get a list of servers from Active Directory based on the specified OU filter
+#$Servers = Get-ADComputer -Filter * | Where-Object {
+#    $OUPartialNames -eq ($_.DistinguishedName -split ',', 2)[1] -replace 'OU=', ''
+#} | Select-Object -ExpandProperty Name
+
+# Get a list of servers from Active Directory based on the specified OU filter
 $Servers = Get-ADComputer -Filter * | Where-Object {
-    $OUPartialNames -eq ($_.DistinguishedName -split ',', 2)[1] -replace 'OU=', ''
+    $OUPartialNames -eq ($_.DistinguishedName -split ',' | ForEach-Object { $_.Trim() -replace 'OU=' }) -contains $_.DistinguishedName
 } | Select-Object -ExpandProperty Name
 
 # Display the list of servers to the user
