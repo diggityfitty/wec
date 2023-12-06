@@ -4,7 +4,7 @@ $SubscriptionName = "test"
 $EventLogName = "Security"  # Adjust based on the event log you want to collect
 
 # Specify the keywords that the OUs must contain
-$OUPartialNames = @("Keyword1", "Keyword2")
+#$OUPartialNames = @("Keyword1", "Keyword2")
 # Add more keywords as needed
 
 # Get a list of servers from Active Directory based on the specified OU filter
@@ -13,8 +13,17 @@ $OUPartialNames = @("Keyword1", "Keyword2")
 #} | Select-Object -ExpandProperty Name
 
 # Get a list of servers from Active Directory based on the specified OU filter
+#$Servers = Get-ADComputer -Filter * | Where-Object {
+#    $OUPartialNames -eq ($_.DistinguishedName -split ',' | ForEach-Object { $_.Trim() -replace 'OU=' }) -contains $_.DistinguishedName
+#} | Select-Object -ExpandProperty Name
+
+# Specify the OU names that the server must be a part of
+$OU1 = "name1"
+$OU2 = "name2"
+
+# Get a list of servers from Active Directory based on the specified OU filter
 $Servers = Get-ADComputer -Filter * | Where-Object {
-    $OUPartialNames -eq ($_.DistinguishedName -split ',' | ForEach-Object { $_.Trim() -replace 'OU=' }) -contains $_.DistinguishedName
+    ($_.DistinguishedName -like "*OU=$OU1,*") -and ($_.DistinguishedName -like "*OU=$OU2,*")
 } | Select-Object -ExpandProperty Name
 
 # Display the list of servers to the user
